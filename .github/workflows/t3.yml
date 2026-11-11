@@ -1,0 +1,16 @@
+name: t3
+on:
+  push:
+    branches: [main]
+jobs:
+  uml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Linux kernel source
+        run: |
+          KVER=$(curl -fsSL https://www.kernel.org/releases.json | jq -r .latest_stable.version)
+          echo "KVER=$KVER" >> "$GITHUB_ENV"
+          curl -fsSL "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KVER.tar.xz" | tar -xJ
+          mv "linux-$KVER" linux-src
+

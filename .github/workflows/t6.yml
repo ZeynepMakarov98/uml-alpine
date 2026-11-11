@@ -1,0 +1,19 @@
+name: t6
+on:
+  push:
+    branches: [main]
+jobs:
+  uml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Boot Alpine inside UML
+        run: |
+          timeout 240 ./linux-src/linux mem=256M con0=fd:0,fd:1 > uml.log 2>&1 || true
+          echo "----- UML boot log -----"
+          tail -40 uml.log
+          grep -q '=== ALPINE BOOTED INSIDE UML ===' uml.log \
+            || { echo "::error::UML never booted Alpine"; exit 1; }
+          grep -q 'apk-tools' uml.log \
+            || { echo "::error::Alpine userspace unhealthy"; exit 1; }
+          echo "::notice::UML ran Linux $KVER with Alpine $AVER inside this GitHub Actions job"
