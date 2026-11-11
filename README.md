@@ -8,14 +8,13 @@ guest networking.
 
 ## What the [workflow](.github/workflows/uml-alpine.yml) does
 
-1. Resolves the latest **6.12 LTS** kernel from `kernel.org/releases.json` (6.12 keeps
-   the classic UML network transports used here) and builds it (`make ARCH=um`) with the
-   Alpine minirootfs embedded as initramfs.
+1. Resolves the latest stable kernel from `kernel.org/releases.json` and builds it
+   (`make ARCH=um`, with `CONFIG_SMP`) with the Alpine minirootfs embedded as initramfs.
 2. Brings up a host-side `tap0`/NAT bridge for the guest (`10.0.2.15` ⇄ `10.0.2.1`).
-3. Boots the kernel as a normal process with a TUN/TAP NIC
-   (`eth0=tuntap,tap0,... con0=fd:0,fd:1`) and **randomized guest RAM** in the 3.0–3.5 GiB
-   range on a 64 MiB grid — no hypervisor involved. (The UML guest runs as a uniprocessor;
-   SMP is not available in this UML/kernel configuration.)
+3. Boots the kernel as a normal process with a vector TAP NIC
+   (`vec=0:transport=tap,ifname=tap0,...`), **SMP** (`ncpus=$(nproc)`), and
+   **randomized guest RAM** in the 3.0–3.5 GiB range on a 64 MiB grid — no hypervisor
+   involved.
 4. Runs a custom command **inside the Alpine guest** for a bounded time, verifies it
    exited successfully, then powers the guest down cleanly.
 

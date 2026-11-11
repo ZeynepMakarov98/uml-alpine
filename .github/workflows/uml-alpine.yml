@@ -43,8 +43,7 @@ jobs:
       - name: Resolve latest stable kernel
         run: |
           curl -fsSL https://www.kernel.org/releases.json -o releases.json
-          KVER=$(jq -r '[.releases[] | select(.version | startswith("6.12."))][0].version' releases.json)
-          [ -z "$KVER" ] && KVER=6.12.117
+          KVER=$(jq -r '.latest_stable.version' releases.json)
           KURL=$(jq -r --arg v "$KVER" '.releases[] | select(.version==$v) | .source' releases.json | head -1)
           echo "KVER=$KVER" >> "$GITHUB_ENV"
           echo "KURL=$KURL" >> "$GITHUB_ENV" 
@@ -72,11 +71,11 @@ jobs:
         run: |
           cd linux-src
           make ARCH=um defconfig
-          scripts/config --file .config -e BLK_DEV_INITRD -e RD_GZIP -e UML_NET -e UML_NET_VECTOR -e UML_NET_TUNTAP --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs"
+          scripts/config --file .config -e BLK_DEV_INITRD -e RD_GZIP -e UML_NET -e UML_NET_VECTOR -e SMP --set-val NR_CPUS 8 --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs"
           make ARCH=um olddefconfig
           make ARCH=um -j"$(nproc)"
           ls -lh linux
-          grep -E '^CONFIG_UML_NET=|^CONFIG_UML_NET_VECTOR=|^CONFIG_UML_NET_TUNTAP=' .config
+          grep -E '^CONFIG_UML_NET=|^CONFIG_UML_NET_VECTOR=|^CONFIG_SMP=|^CONFIG_NR_CPUS=' .config
 
       - name: Set up host NAT prerequisites
         run: |
@@ -90,9 +89,10 @@ jobs:
           MIN=3072; MAX=3584; STEP=64
           N=$(( (MAX - MIN) / STEP + 1 ))
           MEM=$(( MIN + (RANDOM % N) * STEP ))
-          echo "::notice::allocating ${MEM}M guest RAM (random 3072-3584M, 64M grid)"
-          # Start UML in background; it will create/attach tap0 via tuntap backend.
-          sudo timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M con0=fd:0,fd:1 eth0=tuntap,tap0,de:ad:be:ef:00:01 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
+          NCPU=$(nproc)
+          echo "::notice::allocating ${MEM}M guest RAM (random 3072-3584M, 64M grid), ncpus=${NCPU}"
+          # Start UML in background; it will create/attach tap0 via vector tap backend.
+          sudo timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M ncpus=${NCPU} con0=fd:0,fd:1 vec=0:transport=tap,ifname=tap0,mac=de:ad:be:ef:00:01 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
           UMLPID=$!
           # Configure host side of tap0 once it appears.
           for i in $(seq 1 60); do
@@ -114,4 +114,4 @@ jobs:
           grep -q '=== ALPINE BOOTED INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
           grep -q 'cmd exit code: 0' uml.log || { echo '::error::custom command finished with a non-zero status'; exit 1; }
           grep -q 'Power down' uml.log || { echo '::error::guest did not power down cleanly'; exit 1; }
-          echo "::notice::custom command ran inside Alpine $AVER on UML kernel $KVER over tap+NAT with ${MEM}M guest RAM"
+          echo "::notice::custom command ran inside Alpine $AVER on UML kernel $KVER over tap+NAT with ${MEM}M guest RAM, ncpus=${NCPU}"
