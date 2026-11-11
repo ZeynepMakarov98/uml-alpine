@@ -43,11 +43,11 @@ jobs:
       - name: Resolve latest stable kernel
         run: |
           curl -fsSL https://www.kernel.org/releases.json -o releases.json
-          KVER=$(jq -r .latest_stable.version releases.json)
+          KVER=$(jq -r '[.releases[] | select(.version | startswith("6.12."))][0].version' releases.json)
+          [ -z "$KVER" ] && KVER=6.12.117
           KURL=$(jq -r --arg v "$KVER" '.releases[] | select(.version==$v) | .source' releases.json | head -1)
           echo "KVER=$KVER" >> "$GITHUB_ENV"
-          echo "KURL=$KURL" >> "$GITHUB_ENV"
-
+          echo "KURL=$KURL" >> "$GITHUB_ENV" 
       - name: Download Linux kernel source
         run: |
           curl -fsSL "$KURL" | tar -xJ
@@ -60,7 +60,7 @@ jobs:
           mkdir -p rootfs
           curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-minirootfs-$AVER-x86_64.tar.gz" | tar -xz -C rootfs
           mkdir -p rootfs/proc rootfs/sys rootfs/dev
-          echo 'IyEvYmluL3NoCm1vdW50IC10IGRldnRtcGZzIG5vbmUgL2RldiAyPi9kZXYvbnVsbAppZiBbICEgLWMgL2Rldi9jb25zb2xlIF07IHRoZW4KICBta2RpciAtcCAvZGV2CiAgbWtub2QgL2Rldi9jb25zb2xlIGMgNSAxCiAgbWtub2QgL2Rldi90dHkwIGMgNCAwCiAgbWtub2QgL2Rldi9udWxsIGMgMSAzCmZpCmV4ZWMgPD4vZGV2L2NvbnNvbGUgPiYwIDI+JjAKbW91bnQgLXQgcHJvYyBub25lIC9wcm9jCm1vdW50IC10IHN5c2ZzIG5vbmUgL3N5cwpDTURCNjQ9JChzZWQgLW4gJ3MvLipjbWRiNjQ9XChbXiBdKlwpLiovXDEvcCcgL3Byb2MvY21kbGluZSkKVExJTT0kKHNlZCAtbiAncy8uKnRsaW09XChbMC05XSpcKS4qL1wxL3AnIC9wcm9jL2NtZGxpbmUpClsgLXogIiRUTElNIiBdICYmIFRMSU09MzAKaWYgWyAteiAiJENNREI2NCIgXTsgdGhlbiBDTUQ9J2VjaG8gaGVsbG8nOyBlbHNlIENNRD0kKHByaW50ZiAnJXMnICIkQ01EQjY0IiB8IGJhc2U2NCAtZCk7IGZpCmlwIGxpbmsgc2V0IGxvIHVwIDI+L2Rldi9udWxsCmlwIGxpbmsgc2V0IGV0aDAgdXAgMj4vZGV2L251bGwKaXAgYWRkciBhZGQgMTAuMC4yLjE1LzI0IGRldiBldGgwIDI+L2Rldi9udWxsCmlwIHJvdXRlIGFkZCBkZWZhdWx0IHZpYSAxMC4wLjIuMiAyPi9kZXYvbnVsbAplY2hvICduYW1lc2VydmVyIDEwLjAuMi4zJyA+IC9ldGMvcmVzb2x2LmNvbmYKZWNobyAnPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PScKZWNobyAnPT09IEFMUElORSBCT09URUQgSU5TSURFIFVNTCAoc2xpcnAgbmV0d29yaykgPT09JwpjYXQgL2V0Yy9hbHBpbmUtcmVsZWFzZQppcCAtNCBhZGRyIHNob3cgZXRoMCB8IGdyZXAgaW5ldAplY2hvICItLS0gcnVubmluZyBjdXN0b20gY21kICh0aW1lIGxpbWl0ICR7VExJTX1zKTogJENNRCAtLS0iCnNoIC1jICIkQ01EIiAmCkNQSUQ9JCEKUkM9MTI0Cmk9MAp3aGlsZSBbICIkaSIgLWx0ICIkVExJTSIgXTsgZG8KICBpPSQoKGkrMSkpCiAga2lsbCAtMCAiJENQSUQiIDI+L2Rldi9udWxsIHx8IGJyZWFrCiAgc2xlZXAgMQpkb25lCmlmIGtpbGwgLTAgIiRDUElEIiAyPi9kZXYvbnVsbDsgdGhlbgogIGtpbGwgLTkgIiRDUElEIiAyPi9kZXYvbnVsbAogIHdhaXQgIiRDUElEIiAyPi9kZXYvbnVsbAogIGVjaG8gIi0tLSB0aW1lIGxpbWl0IHJlYWNoZWQgKCR7VExJTX1zKSwga2lsbGVkIGNtZCAtLS0iCmVsc2UKICB3YWl0ICIkQ1BJRCIKICBSQz0kPwpmaQplY2hvICItLS0gY21kIGV4aXQgY29kZTogJFJDIC0tLSIKZWNobyAnPT09IFVNTC1BTFBJTkUtVEVTVC1QQVNTRUQgPT09Jwpwb3dlcm9mZiAtZgo=' | base64 -d > rootfs/init
+          echo 'IyEvYmluL3NoCm1vdW50IC10IGRldnRtcGZzIG5vbmUgL2RldiAyPi9kZXYvbnVsbAppZiBbICEgLWMgL2Rldi9jb25zb2xlIF07IHRoZW4KICBta2RpciAtcCAvZGV2CiAgbWtub2QgL2Rldi9jb25zb2xlIGMgNSAxCiAgbWtub2QgL2Rldi90dHkwIGMgNCAwCiAgbWtub2QgL2Rldi9udWxsIGMgMSAzCmZpCmV4ZWMgPD4vZGV2L2NvbnNvbGUgPiYwIDI+JjAKbW91bnQgLXQgcHJvYyBub25lIC9wcm9jCm1vdW50IC10IHN5c2ZzIG5vbmUgL3N5cwpDTURCNjQ9JChzZWQgLW4gJ3MvLipjbWRiNjQ9XChbXiBdKlwpLiovXDEvcCcgL3Byb2MvY21kbGluZSkKVExJTT0kKHNlZCAtbiAncy8uKnRsaW09XChbMC05XSpcKS4qL1wxL3AnIC9wcm9jL2NtZGxpbmUpClsgLXogIiRUTElNIiBdICYmIFRMSU09MzAKaWYgWyAteiAiJENNREI2NCIgXTsgdGhlbiBDTUQ9J2VjaG8gaGVsbG8nOyBlbHNlIENNRD0kKHByaW50ZiAnJXMnICIkQ01EQjY0IiB8IGJhc2U2NCAtZCk7IGZpCmlwIGxpbmsgc2V0IGxvIHVwIDI+L2Rldi9udWxsCmlwIGxpbmsgc2V0IGV0aDAgdXAgMj4vZGV2L251bGwKaXAgYWRkciBhZGQgMTAuMC4yLjE1LzI0IGRldiBldGgwIDI+L2Rldi9udWxsCmlwIHJvdXRlIGFkZCBkZWZhdWx0IHZpYSAxMC4wLjIuMiAyPi9kZXYvbnVsbApwcmludGYgJ25hbWVzZXJ2ZXIgMTAuMC4yLjMKbmFtZXNlcnZlciAxMC4wLjIuMgonID4gL2V0Yy9yZXNvbHYuY29uZgplY2hvICc9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09JwplY2hvICc9PT0gQUxQSU5FIEJPT1RFRCBJTlNJREUgVU1MIChzbGlycCBuZXR3b3JrKSA9PT0nCmNhdCAvZXRjL2FscGluZS1yZWxlYXNlCmlwIC00IGFkZHIgc2hvdyBldGgwIHwgZ3JlcCBpbmV0CmVjaG8gIi0tLSBydW5uaW5nIGN1c3RvbSBjbWQgKHRpbWUgbGltaXQgJHtUTElNfXMpOiAkQ01EIC0tLSIKc2ggLWMgIiRDTUQiICYKQ1BJRD0kIQpSQz0xMjQKaT0wCndoaWxlIFsgIiRpIiAtbHQgIiRUTElNIiBdOyBkbwogIGk9JCgoaSsxKSkKICBraWxsIC0wICIkQ1BJRCIgMj4vZGV2L251bGwgfHwgYnJlYWsKICBzbGVlcCAxCmRvbmUKaWYga2lsbCAtMCAiJENQSUQiIDI+L2Rldi9udWxsOyB0aGVuCiAga2lsbCAtOSAiJENQSUQiIDI+L2Rldi9udWxsCiAgd2FpdCAiJENQSUQiIDI+L2Rldi9udWxsCiAgZWNobyAiLS0tIHRpbWUgbGltaXQgcmVhY2hlZCAoJHtUTElNfXMpLCBraWxsZWQgY21kIC0tLSIKZWxzZQogIHdhaXQgIiRDUElEIgogIFJDPSQ/CmZpCmVjaG8gIi0tLSBjbWQgZXhpdCBjb2RlOiAkUkMgLS0tIgplY2hvICc9PT0gVU1MLUFMUElORS1URVNULVBBU1NFRCA9PT0nCnBvd2Vyb2ZmIC1mCg==' | base64 -d > rootfs/init
           chmod +x rootfs/init
           sudo mkdir -p rootfs/dev
           sudo mknod -m 600 rootfs/dev/console c 5 1
@@ -72,16 +72,16 @@ jobs:
         run: |
           cd linux-src
           make ARCH=um defconfig
-          scripts/config --file .config -e BLK_DEV_INITRD -e RD_GZIP -e UML_NET -e UML_NET_SLIRP --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs"
+          scripts/config --file .config -e BLK_DEV_INITRD -e RD_GZIP -e UML_NET -e UML_NET_SLIRP -d UML_NET_VECTOR --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs"
           make ARCH=um olddefconfig
           make ARCH=um -j"$(nproc)"
           ls -lh linux
-          grep -E 'CONFIG_UML_NET|CONFIG_UML_NET_SLIRP' .config
+          grep -E '^CONFIG_UML_NET=|^CONFIG_UML_NET_SLIRP=|^CONFIG_UML_NET_VECTOR=' .config
 
       - name: Boot Alpine inside UML and run custom command
         timeout-minutes: 10
         run: |
-          timeout $((TLIM + 180)) ./linux-src/linux mem=256M con0=fd:0,fd:1 eth0=slirp,10.0.2.15,10.0.2.2,255.255.255.0 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 || true
+          timeout $((TLIM + 180)) ./linux-src/linux mem=256M con0=fd:0,fd:1 eth0=slirp,10.0.2.15,10.0.2.2 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 || true
           echo "----- UML boot log -----"
           tail -80 uml.log
           grep -q '=== ALPINE BOOTED INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
