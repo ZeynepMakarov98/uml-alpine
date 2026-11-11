@@ -92,7 +92,7 @@ jobs:
           NCPU=$(nproc)
           echo "::notice::allocating ${MEM}M guest RAM (random 3072-3584M, 64M grid), ncpus=${NCPU}"
           # Start UML in background; it will create/attach tap0 via vector tap backend.
-          sudo timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 vec=0:transport=tap,ifname=tap0,mac=de:ad:be:ef:00:01 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
+          sudo timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 vec0:transport=tap,ifname=tap0,mac=de:ad:be:ef:00:01 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
           UMLPID=$!
           # Configure host side of tap0 once it appears.
           for i in $(seq 1 60); do
