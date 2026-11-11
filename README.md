@@ -13,7 +13,8 @@ guest networking.
    Alpine minirootfs embedded as initramfs.
 2. Brings up a host-side `tap0`/NAT bridge for the guest (`10.0.2.15` ⇄ `10.0.2.1`).
 3. Boots the kernel as a normal process with a TUN/TAP NIC
-   (`eth0=tuntap,tap0,... con0=fd:0,fd:1`) — no hypervisor involved.
+   (`eth0=tuntap,tap0,... con0=fd:0,fd:1`) and **randomized guest RAM** in the 3.0–3.5 GiB
+   range on a 64 MiB grid — no hypervisor involved.
 4. Runs a custom command **inside the Alpine guest** for a bounded time, verifies it
    exited successfully, then powers the guest down cleanly.
 

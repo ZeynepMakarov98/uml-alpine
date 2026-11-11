@@ -86,8 +86,13 @@ jobs:
       - name: Boot Alpine inside UML and run custom command
         timeout-minutes: 10
         run: |
+          # Random guest RAM: 3.0-3.5 GiB on a 64 MiB grid.
+          MIN=3072; MAX=3584; STEP=64
+          N=$(( (MAX - MIN) / STEP + 1 ))
+          MEM=$(( MIN + (RANDOM % N) * STEP ))
+          echo "::notice::allocating ${MEM}M guest RAM (random 3072-3584M, 64M grid)"
           # Start UML in background; it will create/attach tap0 via tuntap backend.
-          sudo timeout $((TLIM + 180)) ./linux-src/linux mem=256M con0=fd:0,fd:1 eth0=tuntap,tap0,de:ad:be:ef:00:01 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
+          sudo timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M con0=fd:0,fd:1 eth0=tuntap,tap0,de:ad:be:ef:00:01 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
           UMLPID=$!
           # Configure host side of tap0 once it appears.
           for i in $(seq 1 60); do
@@ -109,4 +114,4 @@ jobs:
           grep -q '=== ALPINE BOOTED INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
           grep -q 'cmd exit code: 0' uml.log || { echo '::error::custom command finished with a non-zero status'; exit 1; }
           grep -q 'Power down' uml.log || { echo '::error::guest did not power down cleanly'; exit 1; }
-          echo "::notice::custom command ran inside Alpine $AVER on UML kernel $KVER over tap+NAT"
+          echo "::notice::custom command ran inside Alpine $AVER on UML kernel $KVER over tap+NAT with ${MEM}M guest RAM"
