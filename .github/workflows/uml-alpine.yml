@@ -92,7 +92,7 @@ jobs:
       - name: Boot Alpine inside UML and run custom command
         timeout-minutes: 10
         run: |
-          timeout $((TLIM + 180)) ./linux-src/linux mem=256M con0=fd:0,fd:1 eth0=tuntap,de:ad:be:ef:00:01,tap0 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 || true
+          timeout $((TLIM + 180)) sudo ./linux-src/linux mem=256M con0=fd:0,fd:1 eth0=tuntap,tap0,de:ad:be:ef:00:01 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 || true
           echo "----- UML boot log -----"
           tail -80 uml.log
           grep -q '=== ALPINE BOOTED INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
