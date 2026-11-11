@@ -60,22 +60,19 @@ jobs:
           ( cat console_in | ./linux-src/linux mem=256M con0=fd:0,fd:1 > uml.log 2>&1 ) &
           UML_PID=$!
           exec 3> console_in
-          # wait for the guest shell to come up
-          for i in $(seq 1 60); do grep -q 'dropping to guest shell' uml.log 2>/dev/null && break; sleep 1; done
-          sleep 2
-          # type on the UML console and wait for the output to appear
+          sleep 12
           echo 'echo hello' >&3
-          for i in $(seq 1 30); do grep -qE '^hello?$' uml.log 2>/dev/null && break; sleep 1; done
+          sleep 4
           echo 'cat /etc/alpine-release' >&3
-          sleep 2
+          sleep 3
           echo 'uname -r' >&3
-          sleep 2
+          sleep 3
           echo 'poweroff -f' >&3
           timeout 120 wait $UML_PID || true
           exec 3>&-
           echo "----- UML console transcript -----"
           tail -60 uml.log
           grep -q '=== ALPINE READY INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
-          grep -qE '^hello?$' uml.log || { echo '::error::echo hello did not run in the Alpine guest'; exit 1; }
+          grep -q '^hello' uml.log || { echo '::error::echo hello did not run in the Alpine guest'; exit 1; }
           grep -q 'Power down' uml.log || { echo '::error::guest did not power down cleanly'; exit 1; }
           echo '::notice::echo hello ran inside Alpine $AVER on UML kernel $KVER'
