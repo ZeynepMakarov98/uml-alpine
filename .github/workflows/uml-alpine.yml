@@ -18,8 +18,11 @@ jobs:
 
       - name: Resolve latest stable kernel
         run: |
-          echo "KVER=$(curl -fsSL https://www.kernel.org/releases.json | jq -r .latest_stable.version)" >> "$GITHUB_ENV"
-          echo "KURL=$(curl -fsSL https://www.kernel.org/releases.json | jq -r '.releases[] | select(.moniker=="stable") | .source')" >> "$GITHUB_ENV"
+          curl -fsSL https://www.kernel.org/releases.json -o releases.json
+          KVER=$(jq -r .latest_stable.version releases.json)
+          KURL=$(jq -r --arg v "$KVER" '.releases[] | select(.version==$v) | .source' releases.json | head -1)
+          echo "KVER=$KVER" >> "$GITHUB_ENV"
+          echo "KURL=$KURL" >> "$GITHUB_ENV"
 
       - name: Download Linux kernel source
         run: |
