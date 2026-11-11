@@ -39,7 +39,7 @@ jobs:
           mkdir -p rootfs
           curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-minirootfs-$AVER-x86_64.tar.gz" | tar -xz -C rootfs
           mkdir -p rootfs/proc rootfs/sys rootfs/dev
-          echo 'IyEvYmluL3NoCm1vdW50IC10IGRldnRtcGZzIG5vbmUgL2RldiAyPi9kZXYvbnVsbAppZiBbICEgLWMgL2Rldi9jb25zb2xlIF07IHRoZW4KICBta2RpciAtcCAvZGV2CiAgbWtub2QgL2Rldi9jb25zb2xlIGMgNSAxCiAgbWtub2QgL2Rldi90dHkwIGMgNCAwCiAgbWtub2QgL2Rldi9udWxsIGMgMSAzCmZpCmV4ZWMgPD4vZGV2L2NvbnNvbGUgPiYwIDI+JjAKbW91bnQgLXQgcHJvYyBub25lIC9wcm9jCm1vdW50IC10IHN5c2ZzIG5vbmUgL3N5cwplY2hvICc9PT0gQUxQSU5FIFJFQURZIElOU0lERSBVTUwg4oCUIGNvbnNvbGUgaXMgbGl2ZSA9PT0nCmNhdCAvZXRjL2FscGluZS1yZWxlYXNlCmVjaG8gJy0tLSBkcm9wcGluZyB0byBndWVzdCBzaGVsbCBvbiB0aGUgVU1MIGNvbnNvbGUgLS0tJwpleGVjIC9iaW4vc2gK' | base64 -d > rootfs/init
+          echo 'IyEvYmluL3NoCm1vdW50IC10IGRldnRtcGZzIG5vbmUgL2RldiAyPi9kZXYvbnVsbAppZiBbICEgLWMgL2Rldi9jb25zb2xlIF07IHRoZW4KICBta2RpciAtcCAvZGV2CiAgbWtub2QgL2Rldi9jb25zb2xlIGMgNSAxCiAgbWtub2QgL2Rldi90dHkwIGMgNCAwCiAgbWtub2QgL2Rldi9udWxsIGMgMSAzCmZpCmV4ZWMgPD4vZGV2L2NvbnNvbGUgPiYwIDI+JjAKbW91bnQgLXQgcHJvYyBub25lIC9wcm9jCm1vdW50IC10IHN5c2ZzIG5vbmUgL3N5cwplY2hvICc9PT0gQUxQSU5FIEJPT1RFRCBJTlNJREUgVU1MID09PScKY2F0IC9ldGMvYWxwaW5lLXJlbGVhc2UKZWNobyAnLS0tIHJ1bm5pbmc6IGVjaG8gaGVsbG8gLS0tJwplY2hvIGhlbGxvCmVjaG8gJy0tLSBydW5uaW5nOiBjYXQgL2V0Yy9hbHBpbmUtcmVsZWFzZSAtLS0nCmNhdCAvZXRjL2FscGluZS1yZWxlYXNlCmVjaG8gJy0tLSBydW5uaW5nOiB1bmFtZSAtciAtLS0nCnVuYW1lIC1yCmVjaG8gJy0tLSBydW5uaW5nOiBhcGsgLS12ZXJzaW9uIC0tLScKYXBrIC0tdmVyc2lvbgplY2hvICc9PT0gVU1MLUFMUElORS1URVNULVBBU1NFRCA9PT0nCnBvd2Vyb2ZmIC1mCg==' | base64 -d > rootfs/init
           chmod +x rootfs/init
           sudo mkdir -p rootfs/dev
           sudo mknod -m 600 rootfs/dev/console c 5 1
@@ -59,23 +59,10 @@ jobs:
       - name: Boot Alpine inside UML and run echo hello
         timeout-minutes: 10
         run: |
-          mkfifo console_in
-          ( cat console_in | ./linux-src/linux mem=256M con0=fd:0,fd:1 > uml.log 2>&1 ) &
-          UML_PID=$!
-          exec 3> console_in
-          sleep 12
-          echo 'echo hello' >&3
-          sleep 4
-          echo 'cat /etc/alpine-release' >&3
-          sleep 3
-          echo 'uname -r' >&3
-          sleep 3
-          echo 'poweroff -f' >&3
-          timeout 120 wait $UML_PID || true
-          exec 3>&-
-          echo "----- UML console transcript -----"
+          timeout 240 ./linux-src/linux mem=256M con0=fd:0,fd:1 > uml.log 2>&1 || true
+          echo "----- UML boot log -----"
           tail -60 uml.log
-          grep -q '=== ALPINE READY INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
-          grep -q '^hello' uml.log || { echo '::error::echo hello did not run in the Alpine guest'; exit 1; }
+          grep -q '=== ALPINE BOOTED INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
+          grep -qE '^hello' uml.log || { echo '::error::echo hello did not run in the Alpine guest'; exit 1; }
           grep -q 'Power down' uml.log || { echo '::error::guest did not power down cleanly'; exit 1; }
           echo '::notice::echo hello ran inside Alpine $AVER on UML kernel $KVER'
