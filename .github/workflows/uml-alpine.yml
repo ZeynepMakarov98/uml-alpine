@@ -72,11 +72,11 @@ jobs:
         run: |
           cd linux-src
           make ARCH=um defconfig
-          scripts/config --file .config -e BLK_DEV_INITRD -e RD_GZIP -e UML_NET -e UML_NET_VECTOR --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs"
+          scripts/config --file .config -e BLK_DEV_INITRD -e RD_GZIP -e UML_NET -e UML_NET_VECTOR -e UML_NET_TUNTAP --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs"
           make ARCH=um olddefconfig
           make ARCH=um -j"$(nproc)"
           ls -lh linux
-          grep -E '^CONFIG_UML_NET=|^CONFIG_UML_NET_VECTOR=' .config
+          grep -E '^CONFIG_UML_NET=|^CONFIG_UML_NET_VECTOR=|^CONFIG_UML_NET_TUNTAP=' .config
 
       - name: Set up host-side tap bridge with NAT
         run: |
@@ -92,7 +92,7 @@ jobs:
       - name: Boot Alpine inside UML and run custom command
         timeout-minutes: 10
         run: |
-          timeout $((TLIM + 180)) ./linux-src/linux mem=256M con0=fd:0,fd:1 vec=0:transport=tap,ifname=tap0,mac=de:ad:be:ef:00:01 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 || true
+          timeout $((TLIM + 180)) ./linux-src/linux mem=256M con0=fd:0,fd:1 eth0=tuntap,de:ad:be:ef:00:01,tap0 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 || true
           echo "----- UML boot log -----"
           tail -80 uml.log
           grep -q '=== ALPINE BOOTED INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
