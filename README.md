@@ -8,24 +8,29 @@ as a plain userspace ELF executable — entirely within a GitHub Actions job.
 What the [workflow](.github/workflows/uml-alpine.yml) does:
 
 1. Resolves the latest stable kernel from `kernel.org/releases.json`
-2. Builds a UML kernel (`ARCH=um`) with the Alpine minirootfs embedded as initramfs
+2. Builds a UML kernel (`make ARCH=um`) with the Alpine minirootfs embedded as initramfs
 3. Boots it as a normal process: `./linux mem=256M con0=fd:0,fd:1`
-4. Runs Alpine's `/init` inside the guest (busybox + apk, Alpine 3.24), prints
-   `uname -a`, `alpine-release`, apk version, then powers off cleanly
+4. Runs `echo hello` and friends **inside the Alpine guest** (via its `/init` on the
+   UML console), verifies the output, then powers the guest down cleanly
 
-Guest log excerpt:
+Guest transcript (from the Actions log):
 
 ```
-Run /init as init process
 === ALPINE BOOTED INSIDE UML ===
 3.24.0
-Linux (none) 7.3.4 ... x86_64 Linux
-NAME="Alpine Linux"
-ID=alpine
-VERSION_ID=3.24.0
+--- running: echo hello ---
+hello
+--- running: cat /etc/alpine-release ---
+3.24.0
+--- running: uname -r ---
+7.3.4
+--- running: apk --version ---
 apk-tools 3.0.6-r0, compiled for x86_64.
 === UML-ALPINE-TEST-PASSED ===
 reboot: Power down
 ```
+
+No hypervisor involved — the Linux kernel itself runs as an ordinary ELF process
+on the runner, with real Alpine userspace (busybox + apk) executing inside it.
 
 Re-run anytime via **Actions → uml-alpine → Run workflow**.
