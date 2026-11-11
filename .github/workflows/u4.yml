@@ -1,0 +1,17 @@
+name: u4
+on:
+  push:
+    branches: [main]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: t
+        timeout-minutes: 10
+        run: |
+          mkfifo console_in
+          ( cat console_in | ./linux > uml.log 2>&1 ) &
+          exec 3> console_in
+          echo 'echo hello' >&3
+          grep -q 'hello' uml.log || true
+          exec 3>&-

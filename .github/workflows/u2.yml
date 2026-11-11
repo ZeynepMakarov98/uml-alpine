@@ -1,0 +1,17 @@
+name: u2
+on:
+  push:
+    branches: [main]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: t
+        run: |
+          mkfifo console_in
+          ( cat console_in | ./linux > uml.log 2>&1 ) &
+          UML_PID=$!
+          exec 3> console_in
+          echo 'echo hello' >&3
+          timeout 120 wait $UML_PID || true
+          exec 3>&-
