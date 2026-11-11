@@ -9,12 +9,14 @@ guest networking.
 ## What the [workflow](.github/workflows/uml-alpine.yml) does
 
 1. Resolves the latest stable kernel from `kernel.org/releases.json` and builds it
-   (`make ARCH=um`, with `CONFIG_SMP`) with the Alpine minirootfs embedded as initramfs.
-2. Brings up a host-side `tap0`/NAT bridge for the guest (`10.0.2.15` ⇄ `10.0.2.1`).
-3. Boots the kernel as a normal process with a vector TAP NIC
-   (`vec=0:transport=tap,ifname=tap0,...`), **SMP** (`ncpus=$(nproc)`), and
-   **randomized guest RAM** in the 3.0–3.5 GiB range on a 64 MiB grid — no hypervisor
-   involved.
+   (`make ARCH=um`, with `CONFIG_SMP` + `CONFIG_UML_NET_VECTOR`) with the Alpine
+   minirootfs embedded as initramfs.
+2. Brings up a host-side veth pair + NAT for the guest (`veth0` `10.0.2.1/24` ⇄ guest
+   `10.0.2.15`).
+3. Boots the kernel as a normal process with **SMP** (`ncpus=$(nproc)`, `seccomp=on`
+   userspace) and **randomized guest RAM** in the 3.0–3.5 GiB range on a 64 MiB grid,
+   then attaches a vector `raw` NIC to `veth0p` via the UML mconsole — no hypervisor
+   involved. The guest runs a custom command for a bounded time and powers down.
 4. Runs a custom command **inside the Alpine guest** for a bounded time, verifies it
    exited successfully, then powers the guest down cleanly.
 

@@ -59,7 +59,7 @@ jobs:
           mkdir -p rootfs
           curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-minirootfs-$AVER-x86_64.tar.gz" | tar -xz -C rootfs
           mkdir -p rootfs/proc rootfs/sys rootfs/dev
-          echo 'IyEvYmluL3NoCm1vdW50IC10IGRldnRtcGZzIG5vbmUgL2RldiAyPi9kZXYvbnVsbAptb3VudCAtdCBwcm9jIG5vbmUgL3Byb2MKbW91bnQgLXQgc3lzZnMgbm9uZSAvc3lzCmVjaG8gJz09PSBBTFBJTkUgQk9PVEVEIElOU0lERSBVTUwgKHRhcCBuZXR3b3JrKSA9PT0nCmNhdCAvZXRjL2FscGluZS1yZWxlYXNlCkNNREI2ND0kKHNlZCAtbiAncy8uKmNtZGI2ND1cKFteIF0qXCkuKi9cMS9wJyAvcHJvYy9jbWRsaW5lKQpUTElNPSQoc2VkIC1uICdzLy4qdGxpbT1cKFswLTldKlwpLiovXDEvcCcgL3Byb2MvY21kbGluZSkKWyAteiAiJFRMSU0iIF0gJiYgVExJTT0zMAppZiBbIC16ICIkQ01EQjY0IiBdOyB0aGVuIENNRD0nZWNobyBoZWxsbyc7IGVsc2UgQ01EPSQocHJpbnRmICclcycgIiRDTURCNjQiIHwgYmFzZTY0IC1kKTsgZmkKaWZjb25maWcgbG8gMTI3LjAuMC4xIHVwIDI+L2Rldi9udWxsIHx8IHRydWUKaWZjb25maWcgZXRoMCAxMC4wLjIuMTUgbmV0bWFzayAyNTUuMjU1LjI1NS4wIHVwIDI+L2Rldi9udWxsCnJvdXRlIGFkZCBkZWZhdWx0IGd3IDEwLjAuMi4xIDI+L2Rldi9udWxsIHx8IHRydWUKZWNobyAnbmFtZXNlcnZlciAxLjEuMS4xJyA+IC9ldGMvcmVzb2x2LmNvbmYKZWNobyAnbmFtZXNlcnZlciA4LjguOC44JyA+PiAvZXRjL3Jlc29sdi5jb25mCmVjaG8gIi0tLSBldGgwIC0tLSIKaWZjb25maWcgZXRoMCAyPi9kZXYvbnVsbCB8IGdyZXAgLUUgJ2luZXQgfGluZXQgYWRkcnxIV2FkZHJ8ZXRoZXInIHx8IGlwIC00IGFkZHIgc2hvdyBldGgwIDI+L2Rldi9udWxsIHx8IHRydWUKZWNobyAiLS0tIHJvdXRlIC0tLSIKcm91dGUgLW4gMj4vZGV2L251bGwgfCBoZWFkIC01IHx8IGlwIHJvdXRlIDI+L2Rldi9udWxsIHx8IHRydWUKZWNobyAiLS0tIHJ1bm5pbmcgY3VzdG9tIGNtZCAodGltZSBsaW1pdCAke1RMSU19cyk6ICRDTUQgLS0tIgpzaCAtYyAiJENNRCIgJgpDUElEPSQhClJDPTEyNAppPTAKd2hpbGUgWyAiJGkiIC1sdCAiJFRMSU0iIF07IGRvCiAgaT0kKChpKzEpKQogIGtpbGwgLTAgIiRDUElEIiAyPi9kZXYvbnVsbCB8fCBicmVhawogIHNsZWVwIDEKZG9uZQppZiBraWxsIC0wICIkQ1BJRCIgMj4vZGV2L251bGw7IHRoZW4KICBraWxsIC05ICIkQ1BJRCIgMj4vZGV2L251bGwKICB3YWl0ICIkQ1BJRCIgMj4vZGV2L251bGwKICBlY2hvICItLS0gdGltZSBsaW1pdCByZWFjaGVkICgke1RMSU19cyksIGtpbGxlZCBjbWQgLS0tIgogIFJDPTEyNAplbHNlCiAgd2FpdCAiJENQSUQiCiAgUkM9JD8KZmkKZWNobyAiLS0tIGNtZCBleGl0IGNvZGU6ICRSQyAtLS0iCmlmIFsgIiRSQyIgLWVxIDAgXTsgdGhlbgogIGVjaG8gJz09PSBVTUwtQUxQSU5FLVRFU1QtUEFTU0VEID09PScKZmkKcG93ZXJvZmYgLWYK' | base64 -d > rootfs/init
+          echo 'IyEvYmluL3NoCm1vdW50IC10IGRldnRtcGZzIG5vbmUgL2RldiAyPi9kZXYvbnVsbAptb3VudCAtdCBwcm9jIG5vbmUgL3Byb2MKbW91bnQgLXQgc3lzZnMgbm9uZSAvc3lzCmVjaG8gJz09PSBBTFBJTkUgQk9PVEVEIElOU0lERSBVTUwgKHRhcCBuZXR3b3JrKSA9PT0nCmNhdCAvZXRjL2FscGluZS1yZWxlYXNlCkNNREI2ND0kKHNlZCAtbiAncy8uKmNtZGI2ND1cKFteIF0qXCkuKi9cMS9wJyAvcHJvYy9jbWRsaW5lKQpUTElNPSQoc2VkIC1uICdzLy4qdGxpbT1cKFswLTldKlwpLiovXDEvcCcgL3Byb2MvY21kbGluZSkKWyAteiAiJFRMSU0iIF0gJiYgVExJTT0zMAppZiBbIC16ICIkQ01EQjY0IiBdOyB0aGVuIENNRD0nZWNobyBoZWxsbyc7IGVsc2UgQ01EPSQocHJpbnRmICclcycgIiRDTURCNjQiIHwgYmFzZTY0IC1kKTsgZmkKaWZjb25maWcgbG8gMTI3LjAuMC4xIHVwIDI+L2Rldi9udWxsIHx8IHRydWUKIyBXYWl0IGZvciBhIG5ldHdvcmsgaW50ZXJmYWNlIChldGgwL3ZlYzApIHRvIGFwcGVhciAobWF5IGJlIGFkZGVkIHZpYSBtY29uc29sZSkuCk5FVElGPSIiCmk9MAp3aGlsZSBbICIkaSIgLWx0IDMwIF07IGRvCiAgZm9yIGQgaW4gL3N5cy9jbGFzcy9uZXQvZXRoMCAvc3lzL2NsYXNzL25ldC92ZWMwOyBkbwogICAgaWYgWyAtZSAiJGQiIF07IHRoZW4gTkVUSUY9JChiYXNlbmFtZSAiJGQiKTsgYnJlYWs7IGZpCiAgZG9uZQogIFsgLW4gIiRORVRJRiIgXSAmJiBicmVhawogIGk9JCgoaSsxKSkKICBzbGVlcCAxCmRvbmUKaWYgWyAtbiAiJE5FVElGIiBdOyB0aGVuCiAgaWZjb25maWcgIiRORVRJRiIgMTAuMC4yLjE1IG5ldG1hc2sgMjU1LjI1NS4yNTUuMCB1cCAyPi9kZXYvbnVsbCB8fCBpcCBhZGRyIGFkZCAxMC4wLjIuMTUvMjQgZGV2ICIkTkVUSUYiIDI+L2Rldi9udWxsIHx8IHRydWUKICByb3V0ZSBhZGQgZGVmYXVsdCBndyAxMC4wLjIuMSAyPi9kZXYvbnVsbCB8fCBpcCByb3V0ZSBhZGQgZGVmYXVsdCB2aWEgMTAuMC4yLjEgMj4vZGV2L251bGwgfHwgdHJ1ZQpmaQplY2hvICduYW1lc2VydmVyIDEuMS4xLjEnID4gL2V0Yy9yZXNvbHYuY29uZgplY2hvICduYW1lc2VydmVyIDguOC44LjgnID4+IC9ldGMvcmVzb2x2LmNvbmYKZWNobyAiLS0tICRORVRJRiAtLS0iCmlmIFsgLW4gIiRORVRJRiIgXTsgdGhlbgogIGlmY29uZmlnICIkTkVUSUYiIDI+L2Rldi9udWxsIHwgZ3JlcCAtRSAnaW5ldCB8aW5ldCBhZGRyfEhXYWRkcnxldGhlcicgfHwgaXAgLTQgYWRkciBzaG93ICIkTkVUSUYiIDI+L2Rldi9udWxsIHx8IHRydWUKZWxzZQogIGVjaG8gIm5vIG5ldHdvcmsgaW50ZXJmYWNlIGZvdW5kIgpmaQplY2hvICItLS0gcm91dGUgLS0tIgpyb3V0ZSAtbiAyPi9kZXYvbnVsbCB8IGhlYWQgLTUgfHwgaXAgcm91dGUgMj4vZGV2L251bGwgfHwgdHJ1ZQplY2hvICItLS0gcnVubmluZyBjdXN0b20gY21kICh0aW1lIGxpbWl0ICR7VExJTX1zKTogJENNRCAtLS0iCnNoIC1jICIkQ01EIiAmCkNQSUQ9JCEKUkM9MTI0Cmk9MAp3aGlsZSBbICIkaSIgLWx0ICIkVExJTSIgXTsgZG8KICBpPSQoKGkrMSkpCiAga2lsbCAtMCAiJENQSUQiIDI+L2Rldi9udWxsIHx8IGJyZWFrCiAgc2xlZXAgMQpkb25lCmlmIGtpbGwgLTAgIiRDUElEIiAyPi9kZXYvbnVsbDsgdGhlbgogIGtpbGwgLTkgIiRDUElEIiAyPi9kZXYvbnVsbAogIHdhaXQgIiRDUElEIiAyPi9kZXYvbnVsbAogIGVjaG8gIi0tLSB0aW1lIGxpbWl0IHJlYWNoZWQgKCR7VExJTX1zKSwga2lsbGVkIGNtZCAtLS0iCiAgUkM9MTI0CmVsc2UKICB3YWl0ICIkQ1BJRCIKICBSQz0kPwpmaQplY2hvICItLS0gY21kIGV4aXQgY29kZTogJFJDIC0tLSIKaWYgWyAiJFJDIiAtZXEgMCBdOyB0aGVuCiAgZWNobyAnPT09IFVNTC1BTFBJTkUtVEVTVC1QQVNTRUQgPT09JwpmaQpwb3dlcm9mZiAtZgo=' | base64 -d > rootfs/init
           chmod +x rootfs/init
           sudo mkdir -p rootfs/dev
           sudo mknod -m 600 rootfs/dev/console c 5 1
@@ -97,7 +97,46 @@ jobs:
           MEM=$(( MIN + (RANDOM % N) * STEP ))
           NCPU=$(nproc)
           echo "::notice::allocating ${MEM}M guest RAM (random 3072-3584M, 64M grid), ncpus=${NCPU}"
-          sudo timeout $((TLIM + 180)) ./linux-src/linux vec=0:transport=raw,ifname=veth0p,mac=de:ad:be:ef:00:01 mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 || true
+          sudo timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
+          UMLPID=$!
+          # Wait for mconsole socket and configure vector network device via mconsole.
+          MCSOCK=""
+          for i in $(seq 1 60); do
+            MCSOCK=$(grep -oP 'mconsole initialized on \K\S+' uml.log 2>/dev/null | head -1 || true)
+            if [ -n "$MCSOCK" ] && sudo test -S "$MCSOCK"; then
+              echo "mconsole socket: $MCSOCK"
+              sudo python3 -c "
+          import socket, struct, sys, os
+          sock_path = sys.argv[1]
+          cmd = b'config vec0:transport=raw,ifname=veth0p,mac=de:ad:be:ef:00:01'
+          req = struct.pack('III', 0xcafebabe, 2, len(cmd)) + cmd.ljust(512, b'\0')
+          c = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+          cs = '/tmp/uml_mc_client.' + str(os.getpid())
+          try:
+              os.unlink(cs)
+          except FileNotFoundError:
+              pass
+          c.bind(cs)
+          c.sendto(req, sock_path)
+          c.settimeout(5)
+          try:
+              data, _ = c.recvfrom(4096)
+              err, more, ln = struct.unpack('III', data[:12])
+              msg = data[12:12+ln].decode(errors='replace')
+              print('mconsole reply err=%d more=%d msg=%r' % (err, more, msg))
+          except Exception as e:
+              print('mconsole recv error:', e)
+          c.close()
+          try:
+              os.unlink(cs)
+          except Exception:
+              pass
+          " "$MCSOCK" || true
+              break
+            fi
+            sleep 1
+          done
+          wait $UMLPID || true
           echo "----- UML boot log -----"
           tail -120 uml.log
           grep -q '=== ALPINE BOOTED INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
