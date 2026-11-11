@@ -1,0 +1,83 @@
+name: uml-alpine
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  uml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev wget xz-utils cpio jq dwarves
+
+      - name: Resolve latest stable kernel
+        run: |
+          curl -fsSL https://www.kernel.org/releases.json -o releases.json
+          KVER=$(jq -r .latest_stable.version releases.json)
+          KURL=$(jq -r --arg v "$KVER" '.releases[] | select(.version==$v) | .source' releases.json | head -1)
+          echo "KVER=$KVER" >> "$GITHUB_ENV"
+          echo "KURL=$KURL" >> "$GITHUB_ENV"
+
+      - name: Download Linux kernel source
+        run: |
+          curl -fsSL "$KURL" | tar -xJ
+          mv "linux-$KVER" linux-src
+
+      - name: Assemble Alpine initramfs
+        run: |
+          AVER=$(curl -fsSL https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/ | grep -oP 'alpine-minirootfs-\K[0-9.]+(?=-x86_64\.tar\.gz)' | head -1)
+          echo "AVER=$AVER" >> "$GITHUB_ENV"
+          mkdir -p rootfs
+          curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-minirootfs-$AVER-x86_64.tar.gz" | tar -xz -C rootfs
+          mkdir -p rootfs/proc rootfs/sys rootfs/dev
+          echo 'IyEvYmluL3NoCm1vdW50IC10IGRldnRtcGZzIG5vbmUgL2RldiAyPi9kZXYvbnVsbAppZiBbICEgLWMgL2Rldi9jb25zb2xlIF07IHRoZW4KICBta2RpciAtcCAvZGV2CiAgbWtub2QgL2Rldi9jb25zb2xlIGMgNSAxCiAgbWtub2QgL2Rldi90dHkwIGMgNCAwCiAgbWtub2QgL2Rldi9udWxsIGMgMSAzCmZpCmV4ZWMgPD4vZGV2L2NvbnNvbGUgPiYwIDI+JjAKbW91bnQgLXQgcHJvYyBub25lIC9wcm9jCm1vdW50IC10IHN5c2ZzIG5vbmUgL3N5cwplY2hvICc9PT0gQUxQSU5FIFJFQURZIElOU0lERSBVTUwg4oCUIGNvbnNvbGUgaXMgbGl2ZSA9PT0nCmNhdCAvZXRjL2FscGluZS1yZWxlYXNlCmVjaG8gJy0tLSBkcm9wcGluZyB0byBndWVzdCBzaGVsbCBvbiB0aGUgVU1MIGNvbnNvbGUgLS0tJwpleGVjIC9iaW4vc2gK' | base64 -d > rootfs/init
+          chmod +x rootfs/init
+          sudo mkdir -p rootfs/dev
+          sudo mknod -m 600 rootfs/dev/console c 5 1
+          sudo mknod -m 666 rootfs/dev/tty0 c 4 0
+          sudo mknod -m 666 rootfs/dev/null c 1 3
+          du -sh rootfs
+
+      - name: Build UML kernel with Alpine embedded
+        run: |
+          cd linux-src
+          make ARCH=um defconfig
+          scripts/config --file .config -e BLK_DEV_INITRD -e RD_GZIP --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs"
+          make ARCH=um olddefconfig
+          make ARCH=um -j"$(nproc)"
+          ls -lh linux
+
+      - name: Boot Alpine inside UML and run echo hello
+        timeout-minutes: 10
+        run: |
+          mkfifo console_in
+          ( cat console_in | ./linux-src/linux mem=256M con0=fd:0,fd:1 > uml.log 2>&1 ) &
+          UML_PID=$!
+          exec 3> console_in
+          # wait for the guest shell to come up
+          for i in $(seq 1 60); do grep -q 'dropping to guest shell' uml.log 2>/dev/null && break; sleep 1; done
+          sleep 2
+          # type on the UML console and wait for the output to appear
+          echo 'echo hello' >&3
+          for i in $(seq 1 30); do grep -qE '^hello
+?$' uml.log 2>/dev/null && break; sleep 1; done
+          echo 'cat /etc/alpine-release' >&3
+          sleep 2
+          echo 'uname -r' >&3
+          sleep 2
+          echo 'poweroff -f' >&3
+          timeout 120 wait $UML_PID || true
+          exec 3>&-
+          echo "----- UML console transcript -----"
+          tail -60 uml.log
+          grep -q '=== ALPINE READY INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
+          grep -qE '^hello
+?$' uml.log || { echo '::error::echo hello did not run in the Alpine guest'; exit 1; }
+          grep -q 'Power down' uml.log || { echo '::error::guest did not power down cleanly'; exit 1; }
+          echo '::notice::echo hello ran inside Alpine $AVER on UML kernel $KVER'
