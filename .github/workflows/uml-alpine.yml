@@ -97,7 +97,7 @@ jobs:
           MEM=$(( MIN + (RANDOM % N) * STEP ))
           NCPU=$(nproc)
           echo "::notice::allocating ${MEM}M guest RAM (random 3072-3584M, 64M grid), ncpus=${NCPU}"
-          sudo timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 vec=0:transport=raw,ifname=veth0p,mac=de:ad:be:ef:00:01 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 || true
+          sudo timeout $((TLIM + 180)) ./linux-src/linux vec=0:transport=raw,ifname=veth0p,mac=de:ad:be:ef:00:01 mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 || true
           echo "----- UML boot log -----"
           tail -120 uml.log
           grep -q '=== ALPINE BOOTED INSIDE UML' uml.log || { echo '::error::UML never booted Alpine'; exit 1; }
