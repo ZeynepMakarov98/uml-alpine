@@ -14,7 +14,10 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev libelf-dev wget xz-utils cpio jq dwarves
+          for i in $(seq 1 6); do
+            sudo apt-get install -y bc bison flex libssl-dev libelf-dev wget xz-utils cpio jq dwarves && break
+            sleep 20
+          done
 
       - name: Resolve latest stable kernel
         run: |
