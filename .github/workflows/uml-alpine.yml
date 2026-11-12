@@ -97,12 +97,18 @@ jobs:
           MEM=$(( MIN + (RANDOM % N) * STEP ))
           NCPU=$(nproc)
           echo "::notice::allocating ${MEM}M guest RAM (random 3072-3584M, 64M grid), ncpus=${NCPU}"
-          sudo stdbuf -oL -eL timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
+          UMID=umlrun
+          sudo stdbuf -oL -eL timeout $((TLIM + 180)) ./linux-src/linux umid=$UMID mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
           UMLPID=$!
           # Wait for mconsole socket and configure vector network device via mconsole.
           MCSOCK=""
+          UMID_DIR="/root/.uml/$UMID"
           for i in $(seq 1 90); do
-            MCSOCK=$(grep -oP 'mconsole initialized on \K\S+' uml.log 2>/dev/null | head -1 || true)
+            if sudo test -S "$UMID_DIR/mconsole"; then
+              MCSOCK="$UMID_DIR/mconsole"
+            else
+              MCSOCK=$(grep -oP 'mconsole initialized on \K\S+' uml.log 2>/dev/null | head -1 || true)
+            fi
             if [ -n "$MCSOCK" ] && sudo test -S "$MCSOCK"; then
               echo "mconsole socket: $MCSOCK"
               echo 'aW1wb3J0IHNvY2tldCxzdHJ1Y3Qsc3lzLG9zCnNvY2s9c3lzLmFyZ3ZbMV0KY21kPWIiY29uZmlnIHZlYzA6dHJhbnNwb3J0PXJhdyxpZm5hbWU9dmV0aDBwLG1hYz1kZTphZDpiZTplZjowMDowMSIKcmVxPXN0cnVjdC5wYWNrKCJJSUkiLDB4Y2FmZWJhYmUsMixsZW4oY21kKSkrY21kLmxqdXN0KDUxMixiIlx4MDAiKQpjPXNvY2tldC5zb2NrZXQoc29ja2V0LkFGX1VOSVgsc29ja2V0LlNPQ0tfREdSQU0pCmNzPSIvdG1wL3VtbF9tY19jbGllbnQuIitzdHIob3MuZ2V0cGlkKCkpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEZpbGVOb3RGb3VuZEVycm9yOgogICAgcGFzcwpjLmJpbmQoY3MpCmMuc2VuZHRvKHJlcSxzb2NrKQpjLnNldHRpbWVvdXQoNSkKdHJ5OgogICAgZGF0YSxfPWMucmVjdmZyb20oNDA5NikKICAgIGVycixtb3JlLGxuPXN0cnVjdC51bnBhY2soIklJSSIsZGF0YVs6MTJdKQogICAgcHJpbnQoIm1jb25zb2xlIHJlcGx5IGVycj0lZCBtb3JlPSVkIG1zZz0lciIlKGVycixtb3JlLGRhdGFbMTI6MTIrbG5dLmRlY29kZShlcnJvcnM9InJlcGxhY2UiKSkpCmV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgIHByaW50KCJtY29uc29sZSByZWN2IGVycm9yOiIsZSkKYy5jbG9zZSgpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEV4Y2VwdGlvbjoKICAgIHBhc3MK' | base64 -d | sudo python3 - "$MCSOCK"
