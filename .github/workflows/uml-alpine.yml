@@ -97,7 +97,7 @@ jobs:
           MEM=$(( MIN + (RANDOM % N) * STEP ))
           NCPU=$(nproc)
           echo "::notice::allocating ${MEM}M guest RAM (random 3072-3584M, 64M grid), ncpus=${NCPU}"
-          sudo timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
+          sudo stdbuf -oL -eL timeout $((TLIM + 180)) ./linux-src/linux mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
           UMLPID=$!
           # Wait for mconsole socket and configure vector network device via mconsole.
           MCSOCK=""
