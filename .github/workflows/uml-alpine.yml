@@ -105,31 +105,21 @@ jobs:
             MCSOCK=$(grep -oP 'mconsole initialized on \K\S+' uml.log 2>/dev/null | head -1 || true)
             if [ -n "$MCSOCK" ] && sudo test -S "$MCSOCK"; then
               echo "mconsole socket: $MCSOCK"
-              sudo python3 - "$MCSOCK" -c 'import socket, struct, sys, os
-sock_path = sys.argv[1]
-cmd = b"config vec0:transport=raw,ifname=veth0p,mac=de:ad:be:ef:00:01"
-req = struct.pack("III", 0xcafebabe, 2, len(cmd)) + cmd.ljust(512, b"\x00")
-c = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-cs = "/tmp/uml_mc_client." + str(os.getpid())
+              sudo python3 -c 'import socket,struct,sys,os; sock=sys.argv[1]; cmd=b"config vec0:transport=raw,ifname=veth0p,mac=de:ad:be:ef:00:01"; req=struct.pack("III",0xcafebabe,2,len(cmd))+cmd.ljust(512,b"\x00"); c=socket.socket(socket.AF_UNIX,socket.SOCK_DGRAM); cs="/tmp/uml_mc_client."+str(os.getpid());
 try:
-    os.unlink(cs)
+ os.unlink(cs)
 except FileNotFoundError:
-    pass
-c.bind(cs)
-c.sendto(req, sock_path)
-c.settimeout(5)
+ pass
+c.bind(cs); c.sendto(req,sock); c.settimeout(5)
 try:
-    data, _ = c.recvfrom(4096)
-    err, more, ln = struct.unpack("III", data[:12])
-    msg = data[12:12+ln].decode(errors="replace")
-    print("mconsole reply err=%d more=%d msg=%r" % (err, more, msg))
+ data,_=c.recvfrom(4096); err,more,ln=struct.unpack("III",data[:12]); print("mconsole reply err=%d more=%d msg=%r"%(err,more,data[12:12+ln].decode(errors="replace")))
 except Exception as e:
-    print("mconsole recv error:", e)
+ print("mconsole recv error:",e)
 c.close()
 try:
-    os.unlink(cs)
+ os.unlink(cs)
 except Exception:
-    pass'
+ pass' "$MCSOCK"
               break
             fi
             if [ $((i % 10)) -eq 0 ]; then echo "waiting for mconsole... (${i}s) sock='${MCSOCK}'"; fi
