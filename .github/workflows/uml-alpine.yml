@@ -105,21 +105,7 @@ jobs:
             MCSOCK=$(grep -oP 'mconsole initialized on \K\S+' uml.log 2>/dev/null | head -1 || true)
             if [ -n "$MCSOCK" ] && sudo test -S "$MCSOCK"; then
               echo "mconsole socket: $MCSOCK"
-              sudo python3 -c 'import socket,struct,sys,os; sock=sys.argv[1]; cmd=b"config vec0:transport=raw,ifname=veth0p,mac=de:ad:be:ef:00:01"; req=struct.pack("III",0xcafebabe,2,len(cmd))+cmd.ljust(512,b"\x00"); c=socket.socket(socket.AF_UNIX,socket.SOCK_DGRAM); cs="/tmp/uml_mc_client."+str(os.getpid());
-try:
- os.unlink(cs)
-except FileNotFoundError:
- pass
-c.bind(cs); c.sendto(req,sock); c.settimeout(5)
-try:
- data,_=c.recvfrom(4096); err,more,ln=struct.unpack("III",data[:12]); print("mconsole reply err=%d more=%d msg=%r"%(err,more,data[12:12+ln].decode(errors="replace")))
-except Exception as e:
- print("mconsole recv error:",e)
-c.close()
-try:
- os.unlink(cs)
-except Exception:
- pass' "$MCSOCK"
+              echo 'aW1wb3J0IHNvY2tldCxzdHJ1Y3Qsc3lzLG9zCnNvY2s9c3lzLmFyZ3ZbMV0KY21kPWIiY29uZmlnIHZlYzA6dHJhbnNwb3J0PXJhdyxpZm5hbWU9dmV0aDBwLG1hYz1kZTphZDpiZTplZjowMDowMSIKcmVxPXN0cnVjdC5wYWNrKCJJSUkiLDB4Y2FmZWJhYmUsMixsZW4oY21kKSkrY21kLmxqdXN0KDUxMixiIlx4MDAiKQpjPXNvY2tldC5zb2NrZXQoc29ja2V0LkFGX1VOSVgsc29ja2V0LlNPQ0tfREdSQU0pCmNzPSIvdG1wL3VtbF9tY19jbGllbnQuIitzdHIob3MuZ2V0cGlkKCkpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEZpbGVOb3RGb3VuZEVycm9yOgogICAgcGFzcwpjLmJpbmQoY3MpCmMuc2VuZHRvKHJlcSxzb2NrKQpjLnNldHRpbWVvdXQoNSkKdHJ5OgogICAgZGF0YSxfPWMucmVjdmZyb20oNDA5NikKICAgIGVycixtb3JlLGxuPXN0cnVjdC51bnBhY2soIklJSSIsZGF0YVs6MTJdKQogICAgcHJpbnQoIm1jb25zb2xlIHJlcGx5IGVycj0lZCBtb3JlPSVkIG1zZz0lciIlKGVycixtb3JlLGRhdGFbMTI6MTIrbG5dLmRlY29kZShlcnJvcnM9InJlcGxhY2UiKSkpCmV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgIHByaW50KCJtY29uc29sZSByZWN2IGVycm9yOiIsZSkKYy5jbG9zZSgpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEV4Y2VwdGlvbjoKICAgIHBhc3MK' | base64 -d | sudo python3 - "$MCSOCK"
               break
             fi
             if [ $((i % 10)) -eq 0 ]; then echo "waiting for mconsole... (${i}s) sock='${MCSOCK}'"; fi
