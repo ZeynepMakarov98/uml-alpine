@@ -11,3 +11,6 @@ echo "nproc=$(nproc) processors=$(grep -c '^processor' /proc/cpuinfo 2>/dev/null
 head -c 120 /tmp/example.html
 echo
 echo "UML-RUN-OK"
+apk update
+apk add curl
+curl ifconfig.me
