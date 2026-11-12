@@ -15,49 +15,85 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Native benchmark (host)
+      - name: Prepare Alpine rootfs for fair comparison (host chroot)
         run: |
           set -e
-          now_ms() { date +%s%3N; }
-          echo "===== NATIVE BENCHMARK START ====="
-          echo "kernel: $(uname -r)"
-          echo "distro: $(. /etc/os-release && echo "$PRETTY_NAME")"
-          echo "nproc: $(nproc)  processors: $(grep -c '^processor' /proc/cpuinfo)"
-          echo "mem_total_kb: $(grep MemTotal /proc/meminfo | awk '{print $2}')"
-          echo "cpu_model: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ //')"
+          AVER=$(curl -fsSL https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/ | grep -oP 'alpine-minirootfs-\K[0-9.]+(?=-x86_64\.tar\.gz)' | head -1)
+          echo "AVER=$AVER" >> "$GITHUB_ENV"
+          sudo mkdir -p /alpine
+          curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-minirootfs-$AVER-x86_64.tar.gz" | sudo tar -xz -C /alpine
+          sudo mkdir -p /alpine/proc /alpine/sys /alpine/dev /alpine/tmp
+          sudo mount --bind /proc /alpine/proc
+          sudo mount --bind /sys /alpine/sys
+          sudo mount --bind /dev /alpine/dev
+          sudo cp /etc/resolv.conf /alpine/etc/resolv.conf
 
-          echo "--- CPU: integer loop (1000000 iters, sh arithmetic) ---"
-          t0=$(now_ms)
-          i=0; while [ "$i" -lt 1000000 ]; do i=$((i+1)); done
-          t1=$(now_ms); echo "cpu_loop_ms=$((t1-t0)) result=$i"
+      - name: Write benchmark script
+        run: |
+          cat > /tmp/bench.sh <<'BENCH'
+          #!/bin/sh
+          set -e
+          LABEL="$1"
+          echo "===== ${LABEL} BENCHMARK START ====="
+          echo "kernel: $(uname -r)"
+          if [ -f /etc/alpine-release ]; then echo "distro: Alpine $(cat /etc/alpine-release)"; elif [ -f /etc/os-release ]; then . /etc/os-release; echo "distro: $PRETTY_NAME"; else echo "distro: unknown"; fi
+          echo "nproc: $(nproc)  processors: $(grep -c '^processor' /proc/cpuinfo 2>/dev/null || echo ?)"
+          echo "mem_total_kb: $(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo unknown)"
+          echo "cpu_model: $(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ //' || echo unknown)"
+
+          now_ms() { awk '{printf "%d", $1*1000}' /proc/uptime 2>/dev/null || date +%s%3N 2>/dev/null || echo $(($(date +%s)*1000)); }
+
+          run3() {
+            name="$1"; shift
+            v1=$("$@"); v2=$("$@"); v3=$("$@")
+            avg=$(( (v1 + v2 + v3) / 3 ))
+            echo "${name}_ms_run1=${v1} ${name}_ms_run2=${v2} ${name}_ms_run3=${v3} ${name}_ms_avg=${avg}"
+          }
+
+          bench_cpu_loop() { t0=$(now_ms); i=0; while [ "$i" -lt 1000000 ]; do i=$((i+1)); done; t1=$(now_ms); echo $((t1-t0)); }
+          bench_sha() { t0=$(now_ms); dd if=/dev/zero bs=1M count=64 2>/dev/null | sha256sum >/tmp/sha.out; t1=$(now_ms); echo $((t1-t0)); }
+          bench_fork() { t0=$(now_ms); i=0; while [ "$i" -lt 2000 ]; do /bin/true; i=$((i+1)); done; t1=$(now_ms); echo $((t1-t0)); }
+          bench_write() { t0=$(now_ms); dd if=/dev/zero of=/tmp/iotest bs=1M count=64 conv=fsync 2>/dev/null; t1=$(now_ms); echo $((t1-t0)); }
+          bench_read() { t0=$(now_ms); dd if=/tmp/iotest of=/dev/null bs=1M 2>/dev/null; t1=$(now_ms); echo $((t1-t0)); }
+          bench_sys_getpid() { t0=$(now_ms); i=0; while [ "$i" -lt 20000 ]; do sh -c ':'; i=$((i+1)); done; t1=$(now_ms); echo $((t1-t0)); }
+
+          echo "--- CPU: integer loop (1,000,000 iters, sh arithmetic) ---"
+          run3 cpu_loop bench_cpu_loop
 
           echo "--- CPU: sha256sum 64 MiB from /dev/zero ---"
-          t0=$(now_ms)
-          dd if=/dev/zero bs=1M count=64 2>/dev/null | sha256sum >/tmp/sha_native.out
-          t1=$(now_ms); echo "sha256_64MiB_ms=$((t1-t0))"; cat /tmp/sha_native.out
+          run3 sha256_64MiB bench_sha
+          echo "sha256: $(cat /tmp/sha.out)"
 
-          echo "--- SYSCALL/PROC: fork+exec /bin/true 2000 times ---"
-          t0=$(now_ms)
-          i=0; while [ "$i" -lt 2000 ]; do /bin/true; i=$((i+1)); done
-          t1=$(now_ms); echo "fork_exec_2000_ms=$((t1-t0))"
+          echo "--- SYSCALL/PROC: fork+exec /bin/true (2,000 times) ---"
+          run3 fork_exec_2000 bench_fork
 
-          echo "--- IO: write 64 MiB to /tmp (dd) ---"
-          t0=$(now_ms)
-          dd if=/dev/zero of=/tmp/iotest_native bs=1M count=64 conv=fsync 2>/dev/null
-          t1=$(now_ms); echo "write_64MiB_ms=$((t1-t0))"
+          echo "--- SYSCALL/PROC: spawn sh -c ':' (20,000 times) ---"
+          run3 spawn_sh_20000 bench_sys_getpid
 
-          echo "--- IO: read 64 MiB from /tmp ---"
-          t0=$(now_ms)
-          dd if=/tmp/iotest_native of=/dev/null bs=1M 2>/dev/null
-          t1=$(now_ms); echo "read_64MiB_ms=$((t1-t0))"
-          rm -f /tmp/iotest_native
+          echo "--- IO: write 64 MiB to /tmp (dd, fsync) ---"
+          run3 write_64MiB bench_write
+
+          echo "--- IO: read 64 MiB from /tmp (dd) ---"
+          run3 read_64MiB bench_read
+          rm -f /tmp/iotest
 
           echo "--- NET: fetch example.com ---"
-          t0=$(now_ms)
-          wget -qO /tmp/bench_native.html http://example.com && echo "net_bytes=$(wc -c < /tmp/bench_native.html)"
-          t1=$(now_ms); echo "net_fetch_ms=$((t1-t0))"
+          t0=$(now_ms); wget -qO /tmp/bench.html http://example.com 2>/dev/null || wget -qO- http://example.com >/tmp/bench.html 2>/dev/null || true; t1=$(now_ms)
+          echo "net_bytes=$(wc -c < /tmp/bench.html 2>/dev/null || echo 0) net_fetch_ms=$((t1-t0))"
 
-          echo "===== NATIVE BENCHMARK END ====="
+          echo "===== ${LABEL} BENCHMARK END ====="
+          BENCH
+          chmod +x /tmp/bench.sh
+          sudo cp /tmp/bench.sh /alpine/bench.sh
+          sudo chmod +x /alpine/bench.sh
+
+      - name: Native benchmark (host, Ubuntu userspace)
+        run: |
+          /tmp/bench.sh "NATIVE-HOST"
+
+      - name: Native benchmark (host kernel, Alpine userspace via chroot)
+        run: |
+          sudo chroot /alpine /bin/sh /bench.sh "NATIVE-ALPINE-CHROOT"
 
       - name: Install build deps
         run: |
@@ -92,11 +128,18 @@ jobs:
 
       - name: Assemble Alpine initramfs with benchmark script
         run: |
-          AVER=$(curl -fsSL https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/ | grep -oP 'alpine-minirootfs-\K[0-9.]+(?=-x86_64\.tar\.gz)' | head -1)
-          echo "AVER=$AVER" >> "$GITHUB_ENV"
+          sudo umount /alpine/dev /alpine/sys /alpine/proc 2>/dev/null || true
           mkdir -p rootfs
-          curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-minirootfs-$AVER-x86_64.tar.gz" | tar -xz -C rootfs
+          # reuse Alpine rootfs prepared earlier
+          sudo tar -C /alpine --exclude='./proc' --exclude='./sys' --exclude='./dev' --exclude='./bench.sh' -cf - . | tar -C rootfs -xf -
           mkdir -p rootfs/proc rootfs/sys rootfs/dev
+          cp /tmp/bench.sh rootfs/bench.sh
+          chmod +x rootfs/bench.sh
+          cat > rootfs/run.sh <<'RUN'
+          #!/bin/sh
+          /bin/sh /bench.sh "UML"
+          RUN
+          chmod +x rootfs/run.sh
           cat > /tmp/init_net.sh <<'INIT'
           #!/bin/sh
           mount -t devtmpfs none /dev 2>/dev/null
@@ -104,127 +147,40 @@ jobs:
           mount -t sysfs none /sys
           echo '=== ALPINE BOOTED INSIDE UML (benchmark) ==='
           cat /etc/alpine-release
-          CMDB64=$(sed -n 's/.*cmdb64=\([^ ]*\).*/\1/p' /proc/cmdline)
           TLIM=$(sed -n 's/.*tlim=\([0-9]*\).*/\1/p' /proc/cmdline)
           [ -z "$TLIM" ] && TLIM=30
-          if [ -x /run.sh ]; then
-            CMD='/run.sh'
-          elif [ -z "$CMDB64" ]; then
-            CMD='echo hello'
-          else
-            CMD=$(printf '%s' "$CMDB64" | base64 -d)
-          fi
+          CMD='/run.sh'
           ifconfig lo 127.0.0.1 up 2>/dev/null || true
-          NETIF=""
-          i=0
+          NETIF=""; i=0
           while [ "$i" -lt 30 ]; do
             for d in /sys/class/net/eth0 /sys/class/net/vec0; do
               if [ -e "$d" ]; then NETIF=$(basename "$d"); break; fi
             done
             [ -n "$NETIF" ] && break
-            i=$((i+1))
-            sleep 1
+            i=$((i+1)); sleep 1
           done
           if [ -n "$NETIF" ]; then
-            ifconfig "$NETIF" 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || ip addr add 10.0.2.15/24 dev "$NETIF" 2>/dev/null || true
-            route add default gw 10.0.2.1 2>/dev/null || ip route add default via 10.0.2.1 2>/dev/null || true
+            ifconfig "$NETIF" 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || true
+            route add default gw 10.0.2.1 2>/dev/null || true
           fi
           echo 'nameserver 1.1.1.1' > /etc/resolv.conf
           echo 'nameserver 8.8.8.8' >> /etc/resolv.conf
-          echo "--- $NETIF ---"
-          if [ -n "$NETIF" ]; then
-            ifconfig "$NETIF" 2>/dev/null | grep -E 'inet |inet addr|HWaddr|ether' || true
-          else
-            echo "no network interface found"
-          fi
-          echo "--- route ---"
-          route -n 2>/dev/null | head -5 || true
-          if [ "$TLIM" = "0" ]; then
-            echo "--- running custom cmd (no time limit): $CMD ---"
-          else
-            echo "--- running custom cmd (time limit ${TLIM}s): $CMD ---"
-          fi
-          if [ "$CMD" = "/run.sh" ]; then
-            /bin/sh /run.sh &
-          else
-            sh -c "$CMD" &
-          fi
-          CPID=$!
-          RC=124
+          if [ "$TLIM" = "0" ]; then echo "--- running (no time limit): $CMD ---"; else echo "--- running (time limit ${TLIM}s): $CMD ---"; fi
+          /bin/sh /run.sh &
+          CPID=$!; RC=124
           if [ "$TLIM" = "0" ]; then
             wait "$CPID"; RC=$?
           else
             i=0
-            while [ "$i" -lt "$TLIM" ]; do
-              i=$((i+1))
-              kill -0 "$CPID" 2>/dev/null || break
-              sleep 1
-            done
-            if kill -0 "$CPID" 2>/dev/null; then
-              kill -9 "$CPID" 2>/dev/null
-              wait "$CPID" 2>/dev/null
-              echo "--- time limit reached (${TLIM}s), killed cmd ---"
-              RC=124
-            else
-              wait "$CPID"; RC=$?
-            fi
+            while [ "$i" -lt "$TLIM" ]; do i=$((i+1)); kill -0 "$CPID" 2>/dev/null || break; sleep 1; done
+            if kill -0 "$CPID" 2>/dev/null; then kill -9 "$CPID" 2>/dev/null; wait "$CPID" 2>/dev/null; echo "--- time limit reached (${TLIM}s) ---"; RC=124; else wait "$CPID"; RC=$?; fi
           fi
           echo "--- cmd exit code: $RC ---"
-          if [ "$RC" -eq 0 ]; then
-            echo '=== UML-ALPINE-TEST-PASSED ==='
-          fi
+          [ "$RC" -eq 0 ] && echo '=== UML-ALPINE-TEST-PASSED ==='
           poweroff -f
           INIT
-          sed -i 's/^          //' /tmp/init_net.sh
           cp /tmp/init_net.sh rootfs/init
           chmod +x rootfs/init
-          cat > rootfs/run.sh <<'BMRUN'
-          #!/bin/sh
-          set -e
-          echo "===== UML BENCHMARK START ====="
-          echo "kernel: $(uname -r)"
-          echo "alpine: $(cat /etc/alpine-release 2>/dev/null || echo unknown)"
-          echo "nproc: $(nproc)  processors: $(grep -c '^processor' /proc/cpuinfo 2>/dev/null || echo ?)"
-          echo "mem_total_kb: $(grep MemTotal /proc/meminfo | awk '{print $2}')"
-          echo "cpu_model: $(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ //' || echo unknown)"
-
-          # /proc/uptime gives centisecond-ish resolution in most kernels (incl UML/busybox env)
-          now_ms() { awk '{printf "%d", $1*1000}' /proc/uptime 2>/dev/null || echo $(($(date +%s)*1000)); }
-
-          echo "--- CPU: integer loop (1000000 iters, sh arithmetic) ---"
-          t0=$(now_ms)
-          i=0; while [ "$i" -lt 1000000 ]; do i=$((i+1)); done
-          t1=$(now_ms); echo "cpu_loop_ms=$((t1-t0)) result=$i"
-
-          echo "--- CPU: sha256sum 64 MiB from /dev/zero ---"
-          t0=$(now_ms)
-          dd if=/dev/zero bs=1M count=64 2>/dev/null | sha256sum >/tmp/sha.out
-          t1=$(now_ms); echo "sha256_64MiB_ms=$((t1-t0))"; cat /tmp/sha.out
-
-          echo "--- SYSCALL/PROC: fork+exec /bin/true 2000 times ---"
-          t0=$(now_ms)
-          i=0; while [ "$i" -lt 2000 ]; do /bin/true; i=$((i+1)); done
-          t1=$(now_ms); echo "fork_exec_2000_ms=$((t1-t0))"
-
-          echo "--- IO: write 64 MiB to /tmp (dd) ---"
-          t0=$(now_ms)
-          dd if=/dev/zero of=/tmp/iotest bs=1M count=64 conv=fsync 2>/dev/null
-          t1=$(now_ms); echo "write_64MiB_ms=$((t1-t0))"
-
-          echo "--- IO: read 64 MiB from /tmp ---"
-          t0=$(now_ms)
-          dd if=/tmp/iotest of=/dev/null bs=1M 2>/dev/null
-          t1=$(now_ms); echo "read_64MiB_ms=$((t1-t0))"
-          rm -f /tmp/iotest
-
-          echo "--- NET: fetch example.com ---"
-          t0=$(now_ms)
-          wget -qO /tmp/bench.html http://example.com && echo "net_bytes=$(wc -c < /tmp/bench.html)"
-          t1=$(now_ms); echo "net_fetch_ms=$((t1-t0))"
-
-          echo "===== UML BENCHMARK END ====="
-          BMRUN
-          chmod +x rootfs/run.sh
           sudo mkdir -p rootfs/dev
           sudo mknod -m 600 rootfs/dev/console c 5 1
           sudo mknod -m 666 rootfs/dev/tty0 c 4 0
@@ -237,7 +193,6 @@ jobs:
           scripts/config --file .config -e BLK_DEV_INITRD -e RD_GZIP -e UML_NET -e UML_NET_VECTOR -e SMP --set-val NR_CPUS 8 --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs"
           make ARCH=um olddefconfig
           make ARCH=um -j"$(nproc)"
-          grep -E '^CONFIG_UML_NET_VECTOR=|^CONFIG_SMP=|^CONFIG_NR_CPUS=' .config
 
       - name: Set up host veth pair and NAT
         run: |
@@ -265,16 +220,13 @@ jobs:
             sudo stdbuf -oL -eL timeout $((TLIM + 180)) ./linux-src/linux umid=$UMID mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
           fi
           UMLPID=$!
-          MCSOCK=""
           UMID_DIR="/root/.uml/$UMID"
           for i in $(seq 1 90); do
-            if sudo test -S "$UMID_DIR/mconsole"; then MCSOCK="$UMID_DIR/mconsole"; fi
-            if [ -n "$MCSOCK" ] && sudo test -S "$MCSOCK"; then
-              echo "mconsole socket: $MCSOCK"
-              echo 'aW1wb3J0IHNvY2tldCxzdHJ1Y3Qsc3lzLG9zCnNvY2s9c3lzLmFyZ3ZbMV0KY21kPWIiY29uZmlnIHZlYzA6dHJhbnNwb3J0PXJhdyxpZm5hbWU9dmV0aDBwLG1hYz1kZTphZDpiZTplZjowMDowMSIKcmVxPXN0cnVjdC5wYWNrKCJJSUkiLDB4Y2FmZWJhYmUsMixsZW4oY21kKSkrY21kLmxqdXN0KDUxMixiIlx4MDAiKQpjPXNvY2tldC5zb2NrZXQoc29ja2V0LkFGX1VOSVgsc29ja2V0LlNPQ0tfREdSQU0pCmNzPSIvdG1wL3VtbF9tY19jbGllbnQuIitzdHIob3MuZ2V0cGlkKCkpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEZpbGVOb3RGb3VuZEVycm9yOgogICAgcGFzcwpjLmJpbmQoY3MpCmMuc2VuZHRvKHJlcSxzb2NrKQpjLnNldHRpbWVvdXQoNSkKdHJ5OgogICAgZGF0YSxfPWMucmVjdmZyb20oNDA5NikKICAgIGVycixtb3JlLGxuPXN0cnVjdC51bnBhY2soIklJSSIsZGF0YVs6MTJdKQogICAgcHJpbnQoIm1jb25zb2xlIHJlcGx5IGVycj0lZCBtb3JlPSVkIG1zZz0lciIlKGVycixtb3JlLGRhdGFbMTI6MTIrbG5dLmRlY29kZShlcnJvcnM9InJlcGxhY2UiKSkpCmV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgIHByaW50KCJtY29uc29sZSByZWN2IGVycm9yOiIsZSkKYy5jbG9zZSgpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEV4Y2VwdGlvbjoKICAgIHBhc3MK' | base64 -d | sudo python3 - "$MCSOCK"
+            if sudo test -S "$UMID_DIR/mconsole"; then
+              echo "mconsole socket: $UMID_DIR/mconsole"
+              echo 'aW1wb3J0IHNvY2tldCxzdHJ1Y3Qsc3lzLG9zCnNvY2s9c3lzLmFyZ3ZbMV0KY21kPWIiY29uZmlnIHZlYzA6dHJhbnNwb3J0PXJhdyxpZm5hbWU9dmV0aDBwLG1hYz1kZTphZDpiZTplZjowMDowMSIKcmVxPXN0cnVjdC5wYWNrKCJJSUkiLDB4Y2FmZWJhYmUsMixsZW4oY21kKSkrY21kLmxqdXN0KDUxMixiIlx4MDAiKQpjPXNvY2tldC5zb2NrZXQoc29ja2V0LkFGX1VOSVgsc29ja2V0LlNPQ0tfREdSQU0pCmNzPSIvdG1wL3VtbF9tY19jbGllbnQuIitzdHIob3MuZ2V0cGlkKCkpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEZpbGVOb3RGb3VuZEVycm9yOgogICAgcGFzcwpjLmJpbmQoY3MpCmMuc2VuZHRvKHJlcSxzb2NrKQpjLnNldHRpbWVvdXQoNSkKdHJ5OgogICAgZGF0YSxfPWMucmVjdmZyb20oNDA5NikKICAgIGVycixtb3JlLGxuPXN0cnVjdC51bnBhY2soIklJSSIsZGF0YVs6MTJdKQogICAgcHJpbnQoIm1jb25zb2xlIHJlcGx5IGVycj0lZCBtb3JlPSVkIG1zZz0lciIlKGVycixtb3JlLGRhdGFbMTI6MTIrbG5dLmRlY29kZShlcnJvcnM9InJlcGxhY2UiKSkpCmV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgIHByaW50KCJtY29uc29sZSByZWN2IGVycm9yOiIsZSkKYy5jbG9zZSgpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEV4Y2VwdGlvbjoKICAgIHBhc3MK' | base64 -d | sudo python3 - "$UMID_DIR/mconsole"
               break
             fi
-            if [ $((i % 10)) -eq 0 ]; then echo "waiting for mconsole... (${i}s)"; fi
             sleep 1
           done
           wait $UMLPID || true
@@ -283,9 +235,8 @@ jobs:
           grep -q '=== UML-ALPINE-TEST-PASSED ===' uml.log || { echo '::error::UML benchmark run failed'; exit 1; }
           echo "::notice::UML benchmark completed (Alpine $AVER, kernel $KVER, ${MEM}M RAM, ncpus=${NCPU})"
 
-      - name: Summary (native vs UML)
+      - name: Comparison notes
         if: always()
         run: |
-          echo "===== COMPARISON (native host vs UML guest) ====="
-          echo "See 'Native benchmark (host)' step for host numbers and 'Boot UML and run benchmark' step for UML numbers above."
-          echo "Note: workloads match (1,000,000 sh-loop, 64MiB sha256/dd, 2,000 fork+exec, example.com fetch) but environments differ (Ubuntu host userspace vs Alpine/busybox guest, initramfs/tmpfs in guest, vector/raw net in guest)."
+          echo "Compare: NATIVE-HOST (Ubuntu userspace), NATIVE-ALPINE-CHROOT (same Alpine userspace, host kernel), UML (Alpine userspace, UML kernel)."
+          echo "This isolates UML kernel/userspace-emulation overhead better (chroot vs UML share userspace/tools)."
