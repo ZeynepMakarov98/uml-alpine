@@ -14,3 +14,5 @@ echo "UML-RUN-OK"
 apk update
 apk add curl
 curl ifconfig.me
+
+sleep 600
