@@ -38,7 +38,7 @@ jobs:
           [ -z "$TLIM" ] && TLIM=30
           echo "CMDB64=$(printf '%s' "$CMD" | base64 -w0)" >> "$GITHUB_ENV"
           echo "TLIM=$TLIM" >> "$GITHUB_ENV"
-          echo "::notice::will run in UML guest for up to ${TLIM}s: $CMD"
+          echo "::notice::will run /run.sh (or custom cmd) in UML guest for up to ${TLIM}s"
 
       - name: Resolve latest stable kernel
         run: |
