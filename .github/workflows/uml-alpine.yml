@@ -31,9 +31,12 @@ jobs:
           done
 
       - name: Resolve custom command and time limit
+        env:
+          CMD_IN: ${{ inputs.cmd }}
+          TLIM_IN: ${{ inputs.timeout_sec }}
         run: |
-          CMD="${{ inputs.cmd }}"
-          TLIM="${{ inputs.timeout_sec }}"
+          CMD="$CMD_IN"
+          TLIM="$TLIM_IN"
           [ -z "$CMD" ] && CMD='wget -q -O - http://example.com > /tmp/example.html && echo NETWORK-OK: got $(wc -c < /tmp/example.html) bytes from example.com'
           [ -z "$TLIM" ] && TLIM=30
           echo "CMDB64=$(printf '%s' "$CMD" | base64 -w0)" >> "$GITHUB_ENV"
