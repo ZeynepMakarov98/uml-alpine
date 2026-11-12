@@ -55,7 +55,7 @@ jobs:
           bench_fork() { t0=$(now_ms); i=0; while [ "$i" -lt 2000 ]; do /bin/true; i=$((i+1)); done; t1=$(now_ms); echo $((t1-t0)); }
           bench_write() { t0=$(now_ms); dd if=/dev/zero of=/tmp/iotest bs=1M count=64 conv=fsync 2>/dev/null; t1=$(now_ms); echo $((t1-t0)); }
           bench_read() { t0=$(now_ms); dd if=/tmp/iotest of=/dev/null bs=1M 2>/dev/null; t1=$(now_ms); echo $((t1-t0)); }
-          bench_sys_getpid() { t0=$(now_ms); i=0; while [ "$i" -lt 20000 ]; do sh -c ':'; i=$((i+1)); done; t1=$(now_ms); echo $((t1-t0)); }
+          bench_spawn_sh() { t0=$(now_ms); i=0; while [ "$i" -lt 2000 ]; do sh -c ':'; i=$((i+1)); done; t1=$(now_ms); echo $((t1-t0)); }
 
           echo "--- CPU: integer loop (1,000,000 iters, sh arithmetic) ---"
           run3 cpu_loop bench_cpu_loop
@@ -67,8 +67,8 @@ jobs:
           echo "--- SYSCALL/PROC: fork+exec /bin/true (2,000 times) ---"
           run3 fork_exec_2000 bench_fork
 
-          echo "--- SYSCALL/PROC: spawn sh -c ':' (20,000 times) ---"
-          run3 spawn_sh_20000 bench_sys_getpid
+          echo "--- SYSCALL/PROC: spawn sh -c ':' (2,000 times) ---"
+          run3 spawn_sh_2000 bench_spawn_sh
 
           echo "--- IO: write 64 MiB to /tmp (dd, fsync) ---"
           run3 write_64MiB bench_write
