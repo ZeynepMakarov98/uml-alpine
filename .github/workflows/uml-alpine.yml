@@ -11,9 +11,9 @@ on:
         default: 'wget -q -O - http://example.com > /tmp/example.html && echo NETWORK-OK: got $(wc -c < /tmp/example.html) bytes from example.com'
         type: string
       timeout_sec:
-        description: 'Run the command for up to this many seconds'
+        description: 'Run the command for up to this many seconds (0 = no limit)'
         required: false
-        default: '30'
+        default: '0'
         type: string
 
 jobs:
@@ -38,10 +38,14 @@ jobs:
           CMD="$CMD_IN"
           TLIM="$TLIM_IN"
           [ -z "$CMD" ] && CMD='wget -q -O - http://example.com > /tmp/example.html && echo NETWORK-OK: got $(wc -c < /tmp/example.html) bytes from example.com'
-          [ -z "$TLIM" ] && TLIM=30
+          [ -z "$TLIM" ] && TLIM=0
           echo "CMDB64=$(printf '%s' "$CMD" | base64 -w0)" >> "$GITHUB_ENV"
           echo "TLIM=$TLIM" >> "$GITHUB_ENV"
-          echo "::notice::will run /run.sh (or custom cmd) in UML guest for up to ${TLIM}s"
+          if [ "$TLIM" = "0" ]; then
+            echo "::notice::will run /run.sh (or custom cmd) in UML guest with no time limit"
+          else
+            echo "::notice::will run /run.sh (or custom cmd) in UML guest for up to ${TLIM}s"
+          fi
 
       - name: Resolve latest stable kernel
         run: |
