@@ -190,7 +190,12 @@ jobs:
         run: |
           cd linux-src
           make ARCH=um defconfig
-          scripts/config --file .config -e BLK_DEV_INITRD -e RD_GZIP -e UML_NET -e UML_NET_VECTOR -e SMP --set-val NR_CPUS 8 --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs"
+          scripts/config --file .config \
+            -e BLK_DEV_INITRD -e RD_GZIP -e UML_NET -e UML_NET_VECTOR -e SMP \
+            --set-val NR_CPUS 8 \
+            --set-str INITRAMFS_SOURCE "$GITHUB_WORKSPACE/rootfs" \
+            -d DEBUG_INFO -d DEBUG_KERNEL -d DEBUG_FS -d KCOV -d KGDB \
+            -e CC_OPTIMIZE_FOR_PERFORMANCE
           make ARCH=um olddefconfig
           make ARCH=um -j"$(nproc)"
 
@@ -205,26 +210,34 @@ jobs:
           sudo iptables -A FORWARD -i veth0 -o eth0 -j ACCEPT
           sudo iptables -A FORWARD -i eth0 -o veth0 -m state --state RELATED,ESTABLISHED -j ACCEPT
 
-      - name: Boot UML and run benchmark
+      - name: Boot UML and run benchmark (optimized)
         timeout-minutes: 30
         run: |
           MIN=3072; MAX=3584; STEP=64
           N=$(( (MAX - MIN) / STEP + 1 ))
           MEM=$(( MIN + (RANDOM % N) * STEP ))
           NCPU=$(nproc)
-          echo "::notice::benchmark alloc ${MEM}M RAM, ncpus=${NCPU}, tlim=${TLIM}"
+          echo "::notice::benchmark alloc ${MEM}M RAM, ncpus=${NCPU}, tlim=${TLIM} (optimized: tmpfs+pinning+quiet)"
+          # Back UML guest RAM with tmpfs (and try hugepages) for better memory locality/perf
+          sudo mkdir -p /mnt/uml-mem
+          sudo mount -t tmpfs -o "size=$((MEM + 512))M,huge=within_size" tmpfs /mnt/uml-mem 2>/dev/null || \
+            sudo mount -t tmpfs -o "size=$((MEM + 512))M" tmpfs /mnt/uml-mem
           UMID=umlrun
+          UMID_DIR="/root/.uml/$UMID"
+          # Pin to a fixed CPU set to reduce migration/cache/TLB thrash
+          MAXCPU=$((NCPU-1))
+          CPUSET="0-${MAXCPU}"
+          UML_CMD="./linux-src/linux umid=$UMID mem=${MEM}M ncpus=${NCPU} seccomp=on quiet loglevel=4 mitigations=off con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM"
           if [ "$TLIM" = "0" ]; then
-            sudo stdbuf -oL -eL ./linux-src/linux umid=$UMID mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
+            sudo env TMPDIR=/mnt/uml-mem TMP=/mnt/uml-mem taskset -c "$CPUSET" stdbuf -oL -eL $UML_CMD > uml.log 2>&1 &
           else
-            sudo stdbuf -oL -eL timeout $((TLIM + 180)) ./linux-src/linux umid=$UMID mem=${MEM}M ncpus=${NCPU} seccomp=on con0=fd:0,fd:1 cmdb64=$CMDB64 tlim=$TLIM > uml.log 2>&1 &
+            sudo env TMPDIR=/mnt/uml-mem TMP=/mnt/uml-mem taskset -c "$CPUSET" stdbuf -oL -eL timeout $((TLIM + 180)) $UML_CMD > uml.log 2>&1 &
           fi
           UMLPID=$!
-          UMID_DIR="/root/.uml/$UMID"
           for i in $(seq 1 90); do
             if sudo test -S "$UMID_DIR/mconsole"; then
               echo "mconsole socket: $UMID_DIR/mconsole"
-              echo 'aW1wb3J0IHNvY2tldCxzdHJ1Y3Qsc3lzLG9zCnNvY2s9c3lzLmFyZ3ZbMV0KY21kPWIiY29uZmlnIHZlYzA6dHJhbnNwb3J0PXJhdyxpZm5hbWU9dmV0aDBwLG1hYz1kZTphZDpiZTplZjowMDowMSIKcmVxPXN0cnVjdC5wYWNrKCJJSUkiLDB4Y2FmZWJhYmUsMixsZW4oY21kKSkrY21kLmxqdXN0KDUxMixiIlx4MDAiKQpjPXNvY2tldC5zb2NrZXQoc29ja2V0LkFGX1VOSVgsc29ja2V0LlNPQ0tfREdSQU0pCmNzPSIvdG1wL3VtbF9tY19jbGllbnQuIitzdHIob3MuZ2V0cGlkKCkpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEZpbGVOb3RGb3VuZEVycm9yOgogICAgcGFzcwpjLmJpbmQoY3MpCmMuc2VuZHRvKHJlcSxzb2NrKQpjLnNldHRpbWVvdXQoNSkKdHJ5OgogICAgZGF0YSxfPWMucmVjdmZyb20oNDA5NikKICAgIGVycixtb3JlLGxuPXN0cnVjdC51bnBhY2soIklJSSIsZGF0YVs6MTJdKQogICAgcHJpbnQoIm1jb25zb2xlIHJlcGx5IGVycj0lZCBtb3JlPSVkIG1zZz0lciIlKGVycixtb3JlLGRhdGFbMTI6MTIrbG5dLmRlY29kZShlcnJvcnM9InJlcGxhY2UiKSkpCmV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgIHByaW50KCJtY29uc29sZSByZWN2IGVycm9yOiIsZSkKYy5jbG9zZSgpCnRyeToKICAgIG9zLnVubGluayhjcykKZXhjZXB0IEV4Y2VwdGlvbjoKICAgIHBhc3MK' | base64 -d | sudo python3 - "$UMID_DIR/mconsole"
+              echo 'aW1wb3J0IHNvY2tldCxzdHJ1Y3Qsc3lzLG9zCnNvY2s9c3lzLmFyZ3ZbMV0KY21kPWIiY29uZmlnIHZlYzA6dHJhbnNwb3J0PXJhdyxpZm5hbWU9dmV0aDBwLG1hYz1kZTphZDpiZTplZjowMDowMSxkZXB0aD0xMjgsZ3JvPTEiCnJlcT1zdHJ1Y3QucGFjaygiSUlJIiwweGNhZmViYWJlLDIsbGVuKGNtZCkpK2NtZC5sanVzdCg1MTIsYiJceDAwIikKYz1zb2NrZXQuc29ja2V0KHNvY2tldC5BRl9VTklYLHNvY2tldC5TT0NLX0RHUkFNKQpjcz0iL3RtcC91bWxfbWNfY2xpZW50LiIrc3RyKG9zLmdldHBpZCgpKQp0cnk6CiAgICBvcy51bmxpbmsoY3MpCmV4Y2VwdCBGaWxlTm90Rm91bmRFcnJvcjoKICAgIHBhc3MKYy5iaW5kKGNzKQpjLnNlbmR0byhyZXEsc29jaykKYy5zZXR0aW1lb3V0KDUpCnRyeToKICAgIGRhdGEsXz1jLnJlY3Zmcm9tKDQwOTYpCiAgICBlcnIsbW9yZSxsbj1zdHJ1Y3QudW5wYWNrKCJJSUkiLGRhdGFbOjEyXSkKICAgIHByaW50KCJtY29uc29sZSByZXBseSBlcnI9JWQgbW9yZT0lZCBtc2c9JXIiJShlcnIsbW9yZSxkYXRhWzEyOjEyK2xuXS5kZWNvZGUoZXJyb3JzPSJyZXBsYWNlIikpKQpleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICBwcmludCgibWNvbnNvbGUgcmVjdiBlcnJvcjoiLGUpCmMuY2xvc2UoKQp0cnk6CiAgICBvcy51bmxpbmsoY3MpCmV4Y2VwdCBFeGNlcHRpb246CiAgICBwYXNzCg==' | base64 -d | sudo python3 - "$UMID_DIR/mconsole"
               break
             fi
             sleep 1
@@ -233,7 +246,7 @@ jobs:
           echo "----- UML BENCHMARK RESULTS -----"
           sed -n '/===== UML BENCHMARK START =====/,/===== UML BENCHMARK END =====/p' uml.log || true
           grep -q '=== UML-ALPINE-TEST-PASSED ===' uml.log || { echo '::error::UML benchmark run failed'; exit 1; }
-          echo "::notice::UML benchmark completed (Alpine $AVER, kernel $KVER, ${MEM}M RAM, ncpus=${NCPU})"
+          echo "::notice::UML benchmark completed (Alpine $AVER, kernel $KVER, ${MEM}M RAM, ncpus=${NCPU}, optimized)"
 
       - name: Comparison notes
         if: always()
